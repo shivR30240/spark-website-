@@ -652,7 +652,13 @@
                     <!-- Timetable Tab -->
                     <div id="timetable" class="tab-content">
                         <div class="bg-gray-800 p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold mb-4">Weekly Timetable</h2>
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-bold">Weekly Timetable</h2>
+                                <button onclick="openEditTimetableModal()"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                                    <i class="fas fa-edit"></i> Edit Timetable
+                                </button>
+                            </div>
 
                             <div class="mb-6 flex justify-between items-center">
                                 <div class="flex space-x-2">
@@ -1058,6 +1064,45 @@
         </div>
     </div>
 
+    <!-- Edit Timetable Modal -->
+    <div id="edit-timetable-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-900 p-6 rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">Edit Timetable</h2>
+                <button onclick="closeEditTimetableModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-300 mb-2">Select Day:</label>
+                <select id="edit-day-select" class="w-full bg-gray-800 text-white p-2 rounded-lg border border-gray-700">
+                    <option value="Mon">Monday</option>
+                    <option value="Tue">Tuesday</option>
+                    <option value="Wed">Wednesday</option>
+                    <option value="Thu">Thursday</option>
+                    <option value="Fri">Friday</option>
+                </select>
+            </div>
+
+            <div id="timetable-entries-container" class="space-y-3 mb-6">
+                <!-- Entries will be dynamically added here -->
+            </div>
+
+            <div class="flex justify-between items-center">
+                <button onclick="addTimetableEntry()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Add Entry
+                </button>
+                <div class="flex gap-3">
+                    <button onclick="closeEditTimetableModal()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                        Cancel
+                    </button>
+                    <button onclick="saveTimetable()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-save mr-2"></i>Save Timetable
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ===== Face Recognition System =====
         const videoReg = document.getElementById('video-reg');
@@ -1428,13 +1473,105 @@
                 if (tabId === 'attendance' && loggedInUser) {
                     startVideo(videoAttendance, canvasAttendance, 'attendance');
                 }
+                
+                // Render timetable when timetable tab is opened
+                if (tabId === 'timetable') {
+                    renderTimetable('Mon');
+                }
             });
         });
 
-        // ===== Timetable Day Change (Simple Simulation) =====
+        // ===== Timetable Management =====
+        // Load timetable from localStorage or initialize with default
+        function loadTimetable() {
+            const saved = localStorage.getItem('studentTimetable');
+            if (saved) {
+                return JSON.parse(saved);
+            }
+            // Default timetable structure
+            return {
+                'Mon': [
+                    { time: '9:00', subject: 'Data Structures', room: 'Room 302', teacher: 'Prof. Sharma', status: 'Completed' },
+                    { time: '10:00', subject: 'Algorithms', room: 'Room 305', teacher: 'Prof. Gupta', status: 'In Progress' },
+                    { time: '11:00', subject: 'Free Period', room: 'Library', teacher: 'Self Study', status: 'Upcoming' },
+                    { time: '12:00', subject: 'Lunch Break', room: 'Cafeteria', teacher: '', status: '' }
+                ],
+                'Tue': [],
+                'Wed': [],
+                'Thu': [],
+                'Fri': []
+            };
+        }
+
+        // Save timetable to localStorage
+        function saveTimetableToStorage(timetable) {
+            localStorage.setItem('studentTimetable', JSON.stringify(timetable));
+        }
+
+        // Render timetable for a specific day
+        function renderTimetable(day) {
+            const timetable = loadTimetable();
+            const dayData = timetable[day] || [];
+            const content = document.getElementById('timetableContent');
+            
+            if (dayData.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <p class="mb-2">No timetable entries for this day.</p>
+                        <p class="text-sm">Click "Edit Timetable" to add entries.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const statusColors = {
+                'Completed': 'bg-green-800 text-green-200',
+                'In Progress': 'bg-yellow-800 text-yellow-200',
+                'Upcoming': 'bg-blue-800 text-blue-200',
+                'Not Started': 'bg-gray-600 text-gray-300',
+                '': ''
+            };
+
+            const borderColors = {
+                'Completed': 'border-green-500',
+                'In Progress': 'border-yellow-500',
+                'Upcoming': 'border-blue-500',
+                'Not Started': 'border-gray-500',
+                '': 'border-gray-500'
+            };
+
+            content.innerHTML = dayData.map(entry => {
+                const statusClass = statusColors[entry.status] || '';
+                const borderClass = borderColors[entry.status] || 'border-gray-500';
+                const timeColor = entry.status === 'Completed' ? 'text-green-200' : 
+                                 entry.status === 'In Progress' ? 'text-yellow-200' : 
+                                 entry.status === 'Upcoming' ? 'text-blue-200' : 'text-gray-300';
+                
+                return `
+                    <div class="flex items-center p-4 border-l-4 ${borderClass} bg-gray-700 rounded-lg">
+                        <div class="w-16 ${timeColor} font-bold">${entry.time}</div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold">${entry.subject}</h3>
+                            <p class="text-sm text-gray-400">${entry.room}${entry.teacher ? ' • ' + entry.teacher : ''}</p>
+                        </div>
+                        ${entry.status ? `<div class="${statusClass} text-xs px-2 py-1 rounded-full">${entry.status}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ===== Timetable Day Change =====
         function changeDay(day) {
-            document.querySelectorAll('#timetable button').forEach(btn => btn.classList.remove('bg-blue-700', 'text-white'));
-            event.target.classList.add('bg-blue-700', 'text-white');
+            document.querySelectorAll('#timetable button').forEach(btn => {
+                if (btn.textContent.trim() === day || btn.textContent.trim() === day.substring(0, 3)) {
+                    btn.classList.remove('bg-gray-700', 'text-gray-300');
+                    btn.classList.add('bg-blue-700', 'text-white');
+                } else {
+                    btn.classList.remove('bg-blue-700', 'text-white');
+                    btn.classList.add('bg-gray-700', 'text-gray-300');
+                }
+            });
+            
             const dates = {
                 'Mon': 'Monday, 18 September 2025',
                 'Tue': 'Tuesday, 19 September 2025',
@@ -1443,27 +1580,197 @@
                 'Fri': 'Friday, 22 September 2025'
             };
             document.getElementById('currentDate').textContent = dates[day] || 'Monday, 12 June 2023';
-            // Simulate content change (static for demo)
-            const content = document.getElementById('timetableContent');
-            content.innerHTML = `
-                <div class="flex items-center p-4 border-l-4 border-blue-500 bg-blue-900 rounded-lg">
-                    <div class="w-16 text-blue-200 font-bold">9:00</div>
-                    <div class="flex-1">
-                        <h3 class="font-semibold">${day} Subject 1</h3>
-                        <p class="text-sm text-gray-400">Room 302 • Prof. Sharma</p>
+            renderTimetable(day);
+        }
+
+        // ===== Edit Timetable Modal Functions =====
+        function openEditTimetableModal() {
+            const modal = document.getElementById('edit-timetable-modal');
+            modal.classList.remove('hidden');
+            loadTimetableForEditing();
+            
+            // Close modal when clicking outside
+            modal.addEventListener('click', function closeOnOutsideClick(e) {
+                if (e.target === modal) {
+                    closeEditTimetableModal();
+                    modal.removeEventListener('click', closeOnOutsideClick);
+                }
+            });
+        }
+
+        function closeEditTimetableModal() {
+            const modal = document.getElementById('edit-timetable-modal');
+            modal.classList.add('hidden');
+        }
+
+        // Store day select change handler to avoid duplicates
+        let daySelectHandler = null;
+        
+        function loadTimetableForEditing() {
+            const timetable = loadTimetable();
+            const daySelect = document.getElementById('edit-day-select');
+            const container = document.getElementById('timetable-entries-container');
+            
+            // Remove existing handler if any
+            if (daySelectHandler) {
+                daySelect.removeEventListener('change', daySelectHandler);
+            }
+            
+            // Load entries for selected day
+            daySelectHandler = () => {
+                const selectedDay = daySelect.value;
+                const dayData = timetable[selectedDay] || [];
+                container.innerHTML = '';
+                
+                dayData.forEach((entry, index) => {
+                    container.appendChild(createEntryRow(entry, index, selectedDay));
+                });
+            };
+            
+            daySelect.addEventListener('change', daySelectHandler);
+            daySelectHandler(); // Initial load
+        }
+
+        function convertTimeToInputFormat(timeStr) {
+            // Convert "9:00 AM" or "9:00" to "09:00" format for time input
+            if (!timeStr) return '09:00';
+            const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+            if (!match) return '09:00';
+            let hours = parseInt(match[1]);
+            const minutes = match[2];
+            const ampm = match[3];
+            
+            if (ampm) {
+                if (ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+                if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+            }
+            return `${hours.toString().padStart(2, '0')}:${minutes}`;
+        }
+
+        function createEntryRow(entry = null, index = null, day = null) {
+            const row = document.createElement('div');
+            row.className = 'bg-gray-800 p-4 rounded-lg border border-gray-700';
+            const timeValue = entry ? convertTimeToInputFormat(entry.time) : '09:00';
+            row.innerHTML = `
+                <div class="grid grid-cols-12 gap-3 items-end">
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-sm mb-1">Time</label>
+                        <input type="time" class="entry-time w-full bg-gray-700 text-white p-2 rounded border border-gray-600" 
+                               value="${timeValue}" required>
                     </div>
-                    <div class="bg-green-800 text-green-200 text-xs px-2 py-1 rounded-full">Completed</div>
-                </div>
-                <div class="flex items-center p-4 border-l-4 border-blue-500 bg-blue-900 rounded-lg">
-                    <div class="w-16 text-blue-200 font-bold">10:00</div>
-                    <div class="flex-1">
-                        <h3 class="font-semibold">${day} Subject 2</h3>
-                        <p class="text-sm text-gray-400">Room 305 • Prof. Gupta</p>
+                    <div class="col-span-3">
+                        <label class="block text-gray-300 text-sm mb-1">Subject</label>
+                        <input type="text" class="entry-subject w-full bg-gray-700 text-white p-2 rounded border border-gray-600" 
+                               value="${entry ? entry.subject : ''}" placeholder="Subject name" required>
                     </div>
-                    <div class="bg-yellow-800 text-yellow-200 text-xs px-2 py-1 rounded-full">In Progress</div>
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-sm mb-1">Room</label>
+                        <input type="text" class="entry-room w-full bg-gray-700 text-white p-2 rounded border border-gray-600" 
+                               value="${entry ? entry.room : ''}" placeholder="Room">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-sm mb-1">Teacher</label>
+                        <input type="text" class="entry-teacher w-full bg-gray-700 text-white p-2 rounded border border-gray-600" 
+                               value="${entry ? entry.teacher : ''}" placeholder="Teacher">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-sm mb-1">Status</label>
+                        <select class="entry-status w-full bg-gray-700 text-white p-2 rounded border border-gray-600">
+                            <option value="" ${entry && !entry.status ? 'selected' : ''}>None</option>
+                            <option value="Not Started" ${entry && entry.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                            <option value="Upcoming" ${entry && entry.status === 'Upcoming' ? 'selected' : ''}>Upcoming</option>
+                            <option value="In Progress" ${entry && entry.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Completed" ${entry && entry.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="col-span-1">
+                        <button onclick="removeTimetableEntry(this)" class="w-full bg-red-600 text-white p-2 rounded hover:bg-red-700 transition">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `;
+            return row;
         }
+
+        function addTimetableEntry() {
+            const container = document.getElementById('timetable-entries-container');
+            const daySelect = document.getElementById('edit-day-select');
+            container.appendChild(createEntryRow(null, null, daySelect.value));
+        }
+
+        function removeTimetableEntry(button) {
+            button.closest('.bg-gray-800').remove();
+        }
+
+        function saveTimetable() {
+            const timetable = loadTimetable();
+            const daySelect = document.getElementById('edit-day-select');
+            const selectedDay = daySelect.value;
+            const container = document.getElementById('timetable-entries-container');
+            const entries = [];
+            
+            container.querySelectorAll('.bg-gray-800').forEach(row => {
+                const timeInput = row.querySelector('.entry-time');
+                const subjectInput = row.querySelector('.entry-subject');
+                const roomInput = row.querySelector('.entry-room');
+                const teacherInput = row.querySelector('.entry-teacher');
+                const statusSelect = row.querySelector('.entry-status');
+                
+                if (timeInput.value && subjectInput.value) {
+                    // Convert time format from HH:MM to H:MM AM/PM if needed, or keep as is
+                    let timeStr = timeInput.value;
+                    if (timeStr.includes(':')) {
+                        const [hours, minutes] = timeStr.split(':');
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const displayHour = hour % 12 || 12;
+                        timeStr = `${displayHour}:${minutes} ${ampm}`;
+                    }
+                    
+                    entries.push({
+                        time: timeStr,
+                        subject: subjectInput.value.trim(),
+                        room: roomInput.value.trim() || '',
+                        teacher: teacherInput.value.trim() || '',
+                        status: statusSelect.value || ''
+                    });
+                }
+            });
+            
+            // Sort entries by time
+            entries.sort((a, b) => {
+                const timeA = parseTime(a.time);
+                const timeB = parseTime(b.time);
+                return timeA - timeB;
+            });
+            
+            timetable[selectedDay] = entries;
+            saveTimetableToStorage(timetable);
+            renderTimetable(selectedDay);
+            showMessage('Timetable saved successfully!');
+            closeEditTimetableModal();
+        }
+
+        function parseTime(timeStr) {
+            // Convert "9:00 AM" or "09:00" to minutes since midnight
+            const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+            if (!match) return 0;
+            let hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const ampm = match[3];
+            
+            if (ampm) {
+                if (ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+                if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+            }
+            return hours * 60 + minutes;
+        }
+
+        // Initialize timetable on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            renderTimetable('Mon');
+        });
 
         // ===== Suggestions Start Buttons =====
         function startSuggestion(type) {
