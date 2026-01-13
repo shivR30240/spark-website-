@@ -676,6 +676,13 @@
                                 <div class="text-blue-400 font-medium" id="currentDate">Monday, 12 June 2023</div>
                             </div>
 
+                            <div class="mb-4 flex justify-end">
+                                <button onclick="insertNewEntry()" 
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Insert Entry
+                                </button>
+                            </div>
+                            
                             <div class="space-y-4" id="timetableContent">
                                 <div class="flex items-center p-4 border-l-4 border-blue-500 bg-blue-900 rounded-lg">
                                     <div class="w-16 text-blue-200 font-bold">9:00</div>
@@ -1508,8 +1515,12 @@
             localStorage.setItem('studentTimetable', JSON.stringify(timetable));
         }
 
+        // Store current day for editing
+        let currentTimetableDay = 'Mon';
+
         // Render timetable for a specific day
         function renderTimetable(day) {
+            currentTimetableDay = day;
             const timetable = loadTimetable();
             const dayData = timetable[day] || [];
             const content = document.getElementById('timetableContent');
@@ -1518,7 +1529,7 @@
                 content.innerHTML = `
                     <div class="text-center py-8 text-gray-400">
                         <p class="mb-2">No timetable entries for this day.</p>
-                        <p class="text-sm">Click "Edit Timetable" to add entries.</p>
+                        <p class="text-sm">Click "Insert Entry" to add entries.</p>
                     </div>
                 `;
                 return;
@@ -1540,7 +1551,7 @@
                 '': 'border-gray-500'
             };
 
-            content.innerHTML = dayData.map(entry => {
+            content.innerHTML = dayData.map((entry, index) => {
                 const statusClass = statusColors[entry.status] || '';
                 const borderClass = borderColors[entry.status] || 'border-gray-500';
                 const timeColor = entry.status === 'Completed' ? 'text-green-200' : 
@@ -1548,16 +1559,183 @@
                                  entry.status === 'Upcoming' ? 'text-blue-200' : 'text-gray-300';
                 
                 return `
-                    <div class="flex items-center p-4 border-l-4 ${borderClass} bg-gray-700 rounded-lg">
-                        <div class="w-16 ${timeColor} font-bold">${entry.time}</div>
+                    <div class="timetable-entry flex items-center p-4 border-l-4 ${borderClass} bg-gray-700 rounded-lg hover:bg-gray-600 transition group" data-index="${index}">
+                        <div class="w-16 ${timeColor} font-bold entry-time-display">${entry.time}</div>
                         <div class="flex-1">
-                            <h3 class="font-semibold">${entry.subject}</h3>
-                            <p class="text-sm text-gray-400">${entry.room}${entry.teacher ? ' • ' + entry.teacher : ''}</p>
+                            <h3 class="font-semibold entry-subject-display">${entry.subject}</h3>
+                            <p class="text-sm text-gray-400 entry-details-display">${entry.room}${entry.teacher ? ' • ' + entry.teacher : ''}</p>
                         </div>
-                        ${entry.status ? `<div class="${statusClass} text-xs px-2 py-1 rounded-full">${entry.status}</div>` : ''}
+                        <div class="flex items-center gap-2">
+                            ${entry.status ? `<div class="${statusClass} text-xs px-2 py-1 rounded-full entry-status-display">${entry.status}</div>` : ''}
+                            <button onclick="editTimetableEntry(${index})" 
+                                class="opacity-0 group-hover:opacity-100 transition px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700" 
+                                title="Edit">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <button onclick="deleteTimetableEntry(${index})" 
+                                class="opacity-0 group-hover:opacity-100 transition px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" 
+                                title="Delete">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        // ===== Inline Timetable Editing Functions =====
+        function insertNewEntry() {
+            const timetable = loadTimetable();
+            const dayData = timetable[currentTimetableDay] || [];
+            
+            // Get the last time or default to 9:00 AM
+            let lastTime = '9:00 AM';
+            if (dayData.length > 0) {
+                const lastEntry = dayData[dayData.length - 1];
+                lastTime = lastEntry.time;
+            }
+            
+            // Create new entry
+            const newEntry = {
+                time: lastTime,
+                subject: 'New Subject',
+                room: '',
+                teacher: '',
+                status: ''
+            };
+            
+            dayData.push(newEntry);
+            timetable[currentTimetableDay] = dayData;
+            saveTimetableToStorage(timetable);
+            renderTimetable(currentTimetableDay);
+            
+            // Automatically start editing the new entry
+            setTimeout(() => {
+                editTimetableEntry(dayData.length - 1);
+            }, 100);
+        }
+
+        function editTimetableEntry(index) {
+            const timetable = loadTimetable();
+            const dayData = timetable[currentTimetableDay] || [];
+            const entry = dayData[index];
+            if (!entry) return;
+            
+            const content = document.getElementById('timetableContent');
+            const entryElement = content.querySelector(`[data-index="${index}"]`);
+            if (!entryElement) return;
+            
+            const timeInputValue = convertTimeToInputFormat(entry.time);
+            
+            entryElement.innerHTML = `
+                <div class="w-full grid grid-cols-12 gap-2 items-center">
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-xs mb-1">Time</label>
+                        <input type="time" class="edit-time w-full bg-gray-800 text-white p-2 rounded border border-gray-600 text-sm" 
+                               value="${timeInputValue}" required>
+                    </div>
+                    <div class="col-span-3">
+                        <label class="block text-gray-300 text-xs mb-1">Subject</label>
+                        <input type="text" class="edit-subject w-full bg-gray-800 text-white p-2 rounded border border-gray-600 text-sm" 
+                               value="${entry.subject}" placeholder="Subject" required>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-xs mb-1">Room</label>
+                        <input type="text" class="edit-room w-full bg-gray-800 text-white p-2 rounded border border-gray-600 text-sm" 
+                               value="${entry.room}" placeholder="Room">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-xs mb-1">Teacher</label>
+                        <input type="text" class="edit-teacher w-full bg-gray-800 text-white p-2 rounded border border-gray-600 text-sm" 
+                               value="${entry.teacher}" placeholder="Teacher">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-gray-300 text-xs mb-1">Status</label>
+                        <select class="edit-status w-full bg-gray-800 text-white p-2 rounded border border-gray-600 text-sm">
+                            <option value="" ${!entry.status ? 'selected' : ''}>None</option>
+                            <option value="Not Started" ${entry.status === 'Not Started' ? 'selected' : ''}>Not Started</option>
+                            <option value="Upcoming" ${entry.status === 'Upcoming' ? 'selected' : ''}>Upcoming</option>
+                            <option value="In Progress" ${entry.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="Completed" ${entry.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="col-span-1 flex gap-1">
+                        <button onclick="saveTimetableEntry(${index})" 
+                            class="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700" title="Save">
+                            <i class="fas fa-check text-xs"></i>
+                        </button>
+                        <button onclick="cancelEditEntry(${index})" 
+                            class="px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700" title="Cancel">
+                            <i class="fas fa-times text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function saveTimetableEntry(index) {
+            const timetable = loadTimetable();
+            const dayData = timetable[currentTimetableDay] || [];
+            const entryElement = document.querySelector(`[data-index="${index}"]`);
+            
+            if (!entryElement) return;
+            
+            const timeInput = entryElement.querySelector('.edit-time');
+            const subjectInput = entryElement.querySelector('.edit-subject');
+            const roomInput = entryElement.querySelector('.edit-room');
+            const teacherInput = entryElement.querySelector('.edit-teacher');
+            const statusSelect = entryElement.querySelector('.edit-status');
+            
+            if (!timeInput || !subjectInput || !subjectInput.value.trim()) {
+                showMessage('Please fill in at least the subject field.');
+                return;
+            }
+            
+            // Convert time format
+            let timeStr = timeInput.value;
+            if (timeStr.includes(':')) {
+                const [hours, minutes] = timeStr.split(':');
+                const hour = parseInt(hours);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour % 12 || 12;
+                timeStr = `${displayHour}:${minutes} ${ampm}`;
+            }
+            
+            dayData[index] = {
+                time: timeStr,
+                subject: subjectInput.value.trim(),
+                room: roomInput.value.trim() || '',
+                teacher: teacherInput.value.trim() || '',
+                status: statusSelect.value || ''
+            };
+            
+            // Sort by time
+            dayData.sort((a, b) => {
+                const timeA = parseTime(a.time);
+                const timeB = parseTime(b.time);
+                return timeA - timeB;
+            });
+            
+            timetable[currentTimetableDay] = dayData;
+            saveTimetableToStorage(timetable);
+            renderTimetable(currentTimetableDay);
+            showMessage('Entry saved successfully!');
+        }
+
+        function cancelEditEntry(index) {
+            renderTimetable(currentTimetableDay);
+        }
+
+        function deleteTimetableEntry(index) {
+            if (!confirm('Are you sure you want to delete this entry?')) return;
+            
+            const timetable = loadTimetable();
+            const dayData = timetable[currentTimetableDay] || [];
+            dayData.splice(index, 1);
+            timetable[currentTimetableDay] = dayData;
+            saveTimetableToStorage(timetable);
+            renderTimetable(currentTimetableDay);
+            showMessage('Entry deleted successfully!');
         }
 
         // ===== Timetable Day Change =====
