@@ -1377,6 +1377,9 @@
                 // Show dashboard after successful login
                 authScreens.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
+                
+                // Initialize dashboard - ensure first tab is active and timetable is ready
+                initializeDashboard();
 
                 if (distance <= RADIUS_METERS) {
                     showMessage("Location verified ✅ Attendance marked!");
@@ -1388,6 +1391,9 @@
                 // Still show dashboard for access
                 authScreens.classList.add('hidden');
                 dashboardContent.classList.remove('hidden');
+                
+                // Initialize dashboard even if location is denied
+                initializeDashboard();
             });
         });
 
@@ -1415,6 +1421,36 @@
                 showMessage("Location permission denied. Attendance not marked.");
             });
         });
+
+        // Initialize dashboard when first shown
+        function initializeDashboard() {
+            // Ensure the first tab (attendance) is active
+            const firstTab = document.querySelector('.tab-btn[data-tab="attendance"]');
+            if (firstTab) {
+                // Remove active from all tabs and content
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('text-blue-400', 'bg-blue-900', 'border-blue-400');
+                    btn.classList.add('text-gray-400');
+                });
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Activate first tab
+                firstTab.classList.remove('text-gray-400');
+                firstTab.classList.add('text-blue-400', 'bg-blue-900');
+                const attendanceContent = document.getElementById('attendance');
+                if (attendanceContent) {
+                    attendanceContent.classList.add('active');
+                }
+            }
+            
+            // Initialize timetable data (but don't render unless tab is opened)
+            // This ensures data is ready when user switches to timetable tab
+            if (typeof loadTimetable === 'function') {
+                loadTimetable(); // Pre-load timetable data
+            }
+        }
 
         // Logout function
         window.logout = function () {
@@ -1525,6 +1561,12 @@
             const dayData = timetable[day] || [];
             const content = document.getElementById('timetableContent');
             
+            // Safety check - ensure element exists
+            if (!content) {
+                console.warn('Timetable content element not found');
+                return;
+            }
+            
             if (dayData.length === 0) {
                 content.innerHTML = `
                     <div class="text-center py-8 text-gray-400">
@@ -1585,6 +1627,13 @@
 
         // ===== Inline Timetable Editing Functions =====
         function insertNewEntry() {
+            // Ensure we're on the timetable tab
+            const timetableTab = document.getElementById('timetable');
+            if (!timetableTab || !timetableTab.classList.contains('active')) {
+                showMessage('Please switch to the Timetable tab first.');
+                return;
+            }
+            
             const timetable = loadTimetable();
             const dayData = timetable[currentTimetableDay] || [];
             
@@ -1945,9 +1994,13 @@
             return hours * 60 + minutes;
         }
 
-        // Initialize timetable on page load
+        // Initialize timetable on page load (only if dashboard is visible)
         window.addEventListener('DOMContentLoaded', () => {
-            renderTimetable('Mon');
+            // Only render if dashboard is already visible (for page refresh scenarios)
+            const dashboardContent = document.getElementById('dashboard-content');
+            if (dashboardContent && !dashboardContent.classList.contains('hidden')) {
+                renderTimetable('Mon');
+            }
         });
 
         // ===== Suggestions Start Buttons =====
@@ -2566,29 +2619,8 @@
     </button>
 
     <script>
-        // NAVIGATION AND FACE-API (Basic UI logic)
-        function showLogin() {
-            document.getElementById('home-screen').classList.add('hidden');
-            document.getElementById('login-screen').classList.remove('hidden');
-            // Show login type selection, hide face recognition
-            document.getElementById('login-type-selection').classList.remove('hidden');
-            document.getElementById('login-face-recognition').classList.add('hidden');
-        }
-
-
-        document.getElementById('login-btn').onclick = function () {
-            document.getElementById('auth-screens').classList.add('hidden');
-            document.getElementById('dashboard-content').classList.remove('hidden');
-        };
-        function logout() { location.reload(); }
-
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                const target = document.getElementById(btn.dataset.tab);
-                if (target) target.classList.add('active');
-            };
-        });
+        // This script block removed - functionality is handled in the main script above
+        // to avoid conflicts with face recognition login, logout, and tab switching
     </script>
 
     <script type="module">
